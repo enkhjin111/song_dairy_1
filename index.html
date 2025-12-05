@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jini's sound diary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { background-color: #1a1a1a; margin: 0; overflow: hidden; }
+        .perspective-1500 { perspective: 1500px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        
+        /* Realistic paper shadow */
+        .page-shadow {
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2); /* Slightly darker shadow for better contrast against full images */
+        }
+
+        /* Paper Texture - Still needed as a base, but images will cover it now */
+        .scrapbook-page {
+            background-color: #fdfbf7;
+            background-image: url("https://www.transparenttextures.com/patterns/cardboard-flat.png");
+        }
+
+        /* FRONT PAGE HOLES (Left Side) */
+        .punched-holes {
+            /* Mask creates the holes */
+            -webkit-mask-image: radial-gradient(circle at 12px 15px, transparent 6px, black 6.5px);
+            -webkit-mask-size: 100% 30px; 
+            -webkit-mask-repeat: repeat-y;
+            mask-image: radial-gradient(circle at 12px 15px, transparent 6px, black 6.5px);
+            mask-size: 100% 30px;
+            mask-repeat: repeat-y;
+            /* Removed border-left here so it doesn't overlay the image */
+        }
+
+        /* BACK PAGE HOLES (Right Side) */
+        .punched-holes-right {
+            -webkit-mask-image: radial-gradient(circle at calc(100% - 12px) 15px, transparent 6px, black 6.5px);
+            -webkit-mask-size: 100% 30px;
+            -webkit-mask-repeat: repeat-y;
+            mask-image: radial-gradient(circle at calc(100% - 12px) 15px, transparent 6px, black 6.5px);
+            mask-size: 100% 30px;
+            mask-repeat: repeat-y;
+             /* Removed border-right here so it doesn't overlay the image */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- CONFIGURATION ---
+        
+        const assets = {
+            cover: "./cover.jpg",
+            insideCover: "./inside_cover.jpg",
+            backCoverInner: "./back_cover_inner.jpg",
+            backCoverOuter: "./back_cover.jpg",
+        };
+
+        const playlist = [
+            {
+                title: "Monday audio",
+                audio: "./song1.MOV",
+                frontImg: "./song1.jpg", 
+                backImg: "./song1_back.jpg", 
+            },
+            {
+                title: "Tuesday audio",
+                audio: "./song2.m4a",
+                frontImg: "./song2.jpg",
+                backImg: "./song2_back.jpg",
+            },
+            {
+                title: "Wesnesday audio",
+                audio: "./song3.MOV",
+                frontImg: "./song3.jpg",
+                backImg: "./song3_back.jpg",
+            },
+            {
+                title: "Thursday audio",
+                audio: "./song4.mov",
+                frontImg: "./song4.jpg",
+                backImg: "./song4_back.jpg",
+            },
+            {
+                title: "Friday audio",
+                audio: "./song5.MOV",
+                frontImg: "./song5.jpg",
+                backImg: "./song5_back.jpg",
+            }
+        ];
+
+        // --- COMPONENTS ---
+
+        const Icons = {
+            Play: () => <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>,
+            Pause: () => <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z"/></svg>,
+            VolumeUp: () => <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/><path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/><path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 8.99 8 3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06zm7.138 2.096a.5.5 0 0 1 0 .708L12.207 8l1.647 1.646a.5.5 0 0 1-.708.708L11.5 8.707l-1.646 1.647a.5.5 0 0 1-.708-.708L10.793 8 9.146 6.354a.5.5 0 1 1 .708-.708L11.5 7.293l1.646-1.647a.5.5 0 0 1 .708 0z"/></svg>,
+            VolumeMute: () => <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06zm7.138 2.096a.5.5 0 0 1 0 .708L13.854 8l-1.647-1.646a.5.5 0 0 1 .708-.708l1.647 1.647a.5.5 0 0 1 0 .708l-1.647 1.647a.5.5 0 0 1-.708-.708L13.854 8zM5 8a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2A.5.5 0 0 1 5 8zm4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2A.5.5 0 0 1 9 8z"/></svg>
+        };
+
+        // Realistic Metal Spiral Component
+        const SpiralCoil = ({ height }) => {
+            const loopSpacing = 30; // Must match the hole mask spacing
+            const loops = Math.ceil(height / loopSpacing);
+
+            return (
+                <div className="absolute top-0 bottom-0 left-[-15px] w-[30px] z-50 pointer-events-none flex flex-col items-center">
+                    <svg width="30" height="100%" preserveAspectRatio="none" style={{overflow: 'visible'}}>
+                        <defs>
+                            <linearGradient id="metalGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style={{stopColor:'#222', stopOpacity:1}} />
+                                <stop offset="30%" style={{stopColor:'#888', stopOpacity:1}} />
+                                <stop offset="50%" style={{stopColor:'#fff', stopOpacity:1}} />
+                                <stop offset="70%" style={{stopColor:'#888', stopOpacity:1}} />
+                                <stop offset="100%" style={{stopColor:'#222', stopOpacity:1}} />
+                            </linearGradient>
+                            <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+                                <feOffset dx="2" dy="2" result="offsetblur"/>
+                                <feComponentTransfer>
+                                    <feFuncA type="linear" slope="0.5"/>
+                                </feComponentTransfer>
+                                <feMerge>
+                                    <feMergeNode/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        {Array.from({ length: loops }).map((_, i) => (
+                            <path 
+                                key={i}
+                                // Curved spiral path
+                                d={`M 2 11 Q 15 -2, 28 11`} 
+                                fill="none"
+                                stroke="url(#metalGradient)"
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                filter="url(#dropShadow)"
+                                transform={`translate(0, ${i * loopSpacing})`}
+                            />
+                        ))}
+                    </svg>
+                </div>
+            );
+        };
+
+
+        function App() {
+            const [sheetIndex, setSheetIndex] = useState(0);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [isMuted, setIsMuted] = useState(false);
+            const audioRef = useRef(null);
+            
+            // Dimensions optimized for ~840x1200 ratio
+            const bookHeight = 600; 
+
+            const activeSongIndex = sheetIndex - 1;
+            const currentTrack = (activeSongIndex >= 0 && activeSongIndex < playlist.length) 
+                ? playlist[activeSongIndex] 
+                : null;
+
+            useEffect(() => {
+                if (!audioRef.current) audioRef.current = new Audio();
+                const audio = audioRef.current;
+                audio.loop = true;
+
+                const handleError = () => { setIsPlaying(false); };
+                const handleEnded = () => setIsPlaying(false);
+                
+                audio.addEventListener('error', handleError);
+                audio.addEventListener('ended', handleEnded);
+
+                const playTrack = async () => {
+                    audio.pause();
+                    if (currentTrack) {
+                        audio.src = currentTrack.audio;
+                        audio.load();
+                        try {
+                            if (!isMuted) await audio.play();
+                            setIsPlaying(true);
+                        } catch (err) {
+                            setIsPlaying(false);
+                        }
+                    } else {
+                        setIsPlaying(false);
+                    }
+                };
+                playTrack();
+                return () => {
+                    audio.removeEventListener('error', handleError);
+                    audio.removeEventListener('ended', handleEnded);
+                };
+            }, [activeSongIndex]);
+
+            useEffect(() => {
+                if (audioRef.current) audioRef.current.muted = isMuted;
+            }, [isMuted]);
+
+            const togglePlay = () => {
+                if (isPlaying) {
+                    audioRef.current.pause();
+                    setIsPlaying(false);
+                } else {
+                    audioRef.current.play();
+                    setIsPlaying(true);
+                }
+            };
+
+            const handleNext = () => {
+                if (sheetIndex < playlist.length + 1) setSheetIndex(prev => prev + 1);
+            };
+
+            const handlePrev = () => {
+                if (sheetIndex > 0) setSheetIndex(prev => prev - 1);
+            };
+
+            const pages = [
+                { front: assets.cover, back: assets.insideCover },
+                ...playlist.map(track => ({ 
+                    front: track.frontImg, 
+                    back: track.backImg
+                })),
+                { front: assets.backCoverInner, back: assets.backCoverOuter }
+            ];
+
+            return (
+                <div className="min-h-screen bg-stone-900 flex items-center justify-center relative select-none overflow-hidden">
+                    
+                    {/* Top Controls */}
+                    <div className="fixed top-8 left-0 right-0 flex justify-center z-50">
+                        <div className="bg-black/40 backdrop-blur-md border border-white/10 text-white pl-6 pr-4 py-2 rounded-full flex items-center gap-4 shadow-xl">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-neutral-500'}`}></div>
+                                <span className="font-mono text-sm tracking-widest uppercase w-48 truncate">
+                                    {currentTrack ? currentTrack.title : "Notebook Audio"}
+                                </span>
+                            </div>
+                            <div className="h-6 w-px bg-white/20"></div>
+                            <button onClick={togglePlay} className="hover:text-green-400 transition-colors">
+                                {isPlaying ? <Icons.Pause /> : <Icons.Play />}
+                            </button>
+                            <button onClick={() => setIsMuted(!isMuted)} className="hover:text-blue-400 transition-colors">
+                                {isMuted ? <Icons.VolumeMute /> : <Icons.VolumeUp />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* MAIN LAYOUT */}
+                    <div className="w-full h-full flex items-center justify-center relative">
+                        
+                        {/* BOOK CONTAINER */}
+                        <div className="perspective-1500 z-10">
+                            
+                            {/* Slide container to Right when open so Spine is Centered */}
+                            <div 
+                                className={`relative w-[320px] sm:w-[380px] md:w-[420px] transform-style-3d group transition-transform duration-500 ${sheetIndex > 0 ? 'translate-x-[50%]' : ''}`}
+                                style={{ height: `${bookHeight}px` }}
+                            >
+                                {/* SPIRAL SPINE */}
+                                <SpiralCoil height={bookHeight} />
+
+                                {pages.map((page, i) => {
+                                    const isFlipped = i < sheetIndex;
+                                    const zIndex = isFlipped ? i : pages.length - i;
+                                    
+                                    return (
+                                        <div 
+                                            key={i}
+                                            className="absolute top-0 left-0 w-full h-full duration-700 ease-[cubic-bezier(0.645,0.045,0.355,1)] transform-style-3d origin-left transition-transform"
+                                            style={{ 
+                                                zIndex: zIndex,
+                                                transform: `rotateY(${isFlipped ? -180 : 0}deg)`,
+                                            }}
+                                        >
+                                            {/* FRONT OF PAGE (Right Page) */}
+                                            <div onClick={handleNext} className="absolute inset-0 backface-hidden rounded-r-md overflow-hidden scrapbook-page shadow-xl page-shadow cursor-pointer punched-holes">
+                                                {/* FIXED: Removed pl-6 padding so image hits the edge */}
+                                                <div className="w-full h-full"> 
+                                                    <img 
+                                                        src={page.front} 
+                                                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/840x1200/333/fff?text=Image+Missing"; }}
+                                                        // Changed mix-blend-multiply to mix-blend-darken for better photo rendering over texture
+                                                        className="w-full h-full object-cover pointer-events-none mix-blend-darken" 
+                                                    />
+                                                </div>
+                                                {/* Lighter gradient overlay */}
+                                                <div className="absolute inset-0 bg-gradient-to-l from-black/10 to-transparent pointer-events-none mix-blend-overlay"></div>
+                                            </div>
+
+                                            {/* BACK OF PAGE (Left Page) */}
+                                            <div onClick={handlePrev} className="absolute inset-0 backface-hidden rounded-l-md overflow-hidden scrapbook-page shadow-xl page-shadow flex items-center justify-center cursor-pointer punched-holes-right" style={{ transform: 'rotateY(180deg)' }}>
+                                                {/* FIXED: Removed pr-6 padding so image hits the edge */}
+                                                <div className="w-full h-full">
+                                                    <img 
+                                                        src={page.back} 
+                                                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/840x1200/333/fff?text=Image+Missing"; }}
+                                                        // Changed mix-blend-multiply to mix-blend-darken for better photo rendering over texture
+                                                        className="w-full h-full object-cover pointer-events-none mix-blend-darken" 
+                                                    />
+                                                </div>
+                                                {/* Lighter gradient overlay */}
+                                                <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none mix-blend-overlay"></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className={`absolute -bottom-12 w-full text-center text-white/20 font-mono text-xs transition-transform duration-500 ${sheetIndex > 0 ? 'translate-x-[50%]' : ''}`}>
+                                Tap edges to flip pages
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
